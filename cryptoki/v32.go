@@ -87,7 +87,7 @@ func (c *Ctx) DecapsulateKey(sh SessionHandle, m *Mechanism, privKey ObjectHandl
 	defer freeMech()
 	arr, n, freeAttrs := cAttributes(tmpl)
 	defer freeAttrs()
-	ct, ctLen := cBytes(ciphertext)
+	ct, ctLen := cInput(ciphertext)
 	defer free(ct)
 
 	var key C.CK_OBJECT_HANDLE
@@ -110,7 +110,7 @@ func (c *Ctx) VerifySignatureInit(sh SessionHandle, m *Mechanism, key ObjectHand
 	defer release()
 	mech, freeMech := cMechanism(m)
 	defer freeMech()
-	sig, sn := cBytes(signature)
+	sig, sn := cInput(signature)
 	defer free(sig)
 	rv := C.ck_verify_signature_init(mod, C.CK_SESSION_HANDLE(sh), mech,
 		C.CK_OBJECT_HANDLE(key), (C.CK_BYTE_PTR)(sig), sn)
@@ -126,7 +126,7 @@ func (c *Ctx) VerifySignature(sh SessionHandle, data []byte) error {
 		return err
 	}
 	defer release()
-	p, n := cBytes(data)
+	p, n := cInput(data)
 	defer zfree(p, n)
 	return toError(uint(C.ck_verify_signature(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(p), n)))
 }
@@ -139,7 +139,7 @@ func (c *Ctx) VerifySignatureUpdate(sh SessionHandle, part []byte) error {
 		return err
 	}
 	defer release()
-	p, n := cBytes(part)
+	p, n := cInput(part)
 	defer zfree(p, n)
 	return toError(uint(C.ck_verify_signature_update(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(p), n)))
 }
@@ -182,7 +182,7 @@ func (c *Ctx) WrapKeyAuthenticated(sh SessionHandle, m *Mechanism, wrappingKey, 
 	defer release()
 	mech, freeMech := cMechanism(m)
 	defer freeMech()
-	ad, adLen := cBytes(aad)
+	ad, adLen := cInput(aad)
 	defer free(ad)
 	return outOp(func(out C.CK_BYTE_PTR, outLen *C.CK_ULONG) C.CK_RV {
 		return C.ck_wrap_key_authenticated(mod, C.CK_SESSION_HANDLE(sh), mech,
@@ -202,9 +202,9 @@ func (c *Ctx) UnwrapKeyAuthenticated(sh SessionHandle, m *Mechanism, unwrappingK
 	defer release()
 	mech, freeMech := cMechanism(m)
 	defer freeMech()
-	wp, wn := cBytes(wrapped)
+	wp, wn := cInput(wrapped)
 	defer free(wp)
-	ad, adLen := cBytes(aad)
+	ad, adLen := cInput(aad)
 	defer free(ad)
 	arr, n, freeAttrs := cAttributes(tmpl)
 	defer freeAttrs()

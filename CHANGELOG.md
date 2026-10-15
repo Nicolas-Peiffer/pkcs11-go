@@ -16,6 +16,19 @@ independent of the PKCS #11 specification revision the binding targets, which is
 
 ## [Unreleased]
 
+### Fixed
+
+- **Zero-length input is passed as a valid buffer.** `Sign`, `Verify`, `Encrypt`,
+  `Decrypt`, `Digest`, their `Update` variants, the combined dual-function calls,
+  `VerifySignature*`, `DecapsulateKey`, `WrapKeyAuthenticated`/`UnwrapKeyAuthenticated`,
+  `UnwrapKey`, `SeedRandom` and `SetOperationState` handed the module a NULL pointer for
+  an empty slice. PKCS #11 does not promise that NULL is acceptable when the length is 0,
+  and SoftHSM2 rejects it with `CKR_ARGUMENTS_BAD`, so the digest or signature of an
+  empty message, and AES-GCM over associated data only, could not be computed. Every data
+  input now gets a non-NULL buffer with length 0. This replaces the one-off workaround
+  `SignUpdate` and `VerifyUpdate` already carried. Mechanism parameters, attribute
+  values and PINs are unchanged, since for those NULL means "absent".
+
 ### Changed
 
 - Build and test toolchain bumped from `go1.27.1` to `go1.27.2` (`toolchain` directive in

@@ -17,7 +17,7 @@ func (c *Ctx) DigestEncryptUpdate(sh SessionHandle, part []byte) ([]byte, error)
 		return nil, err
 	}
 	defer release()
-	p, n := cBytes(part)
+	p, n := cInput(part)
 	defer zfree(p, n)
 	return outOp(func(out C.CK_BYTE_PTR, outLen *C.CK_ULONG) C.CK_RV {
 		return C.ck_digest_encrypt_update(m, C.CK_SESSION_HANDLE(sh),
@@ -34,7 +34,7 @@ func (c *Ctx) DecryptDigestUpdate(sh SessionHandle, cipher []byte) ([]byte, erro
 		return nil, err
 	}
 	defer release()
-	p, n := cBytes(cipher)
+	p, n := cInput(cipher)
 	defer zfree(p, n)
 	return outOp(func(out C.CK_BYTE_PTR, outLen *C.CK_ULONG) C.CK_RV {
 		return C.ck_decrypt_digest_update(m, C.CK_SESSION_HANDLE(sh),
@@ -51,7 +51,7 @@ func (c *Ctx) SignEncryptUpdate(sh SessionHandle, part []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer release()
-	p, n := cBytes(part)
+	p, n := cInput(part)
 	defer zfree(p, n)
 	return outOp(func(out C.CK_BYTE_PTR, outLen *C.CK_ULONG) C.CK_RV {
 		return C.ck_sign_encrypt_update(m, C.CK_SESSION_HANDLE(sh),
@@ -69,7 +69,7 @@ func (c *Ctx) DecryptVerifyUpdate(sh SessionHandle, cipher []byte) ([]byte, erro
 		return nil, err
 	}
 	defer release()
-	p, n := cBytes(cipher)
+	p, n := cInput(cipher)
 	defer zfree(p, n)
 	return outOp(func(out C.CK_BYTE_PTR, outLen *C.CK_ULONG) C.CK_RV {
 		return C.ck_decrypt_verify_update(m, C.CK_SESSION_HANDLE(sh),
