@@ -16,6 +16,12 @@ independent of the PKCS #11 specification revision the binding targets, which is
 
 ## [Unreleased]
 
+### Added
+
+- `SECURITY.md`: how to report a vulnerability privately (GitHub private vulnerability
+  reporting or the Eclipse Foundation security team), which versions receive fixes, and what
+  is in scope for a binding that loads native PKCS #11 modules.
+
 ### Changed
 
 - Build and test toolchain bumped from `go1.27.1` to `go1.27.2` (`toolchain` directive in
