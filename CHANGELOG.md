@@ -16,6 +16,16 @@ independent of the PKCS #11 specification revision the binding targets, which is
 
 ## [Unreleased]
 
+### Fixed
+
+- **A module's v3.2 interface is found when it is not the default.** The loader called
+  `C_GetInterface("PKCS 11", NULL, …)`, which returns the module's *default* interface. A
+  module whose default is 3.0 but which also implements 3.2 was therefore reported by
+  `SupportsV32` as lacking it, and the v3.2 calls (ML-KEM encapsulation, `VerifySignature`,
+  authenticated wrapping) failed with `CKR_FUNCTION_NOT_SUPPORTED`. The loader now asks for
+  version 3.2 by name first and falls back to the default interface. A mock module built by
+  the new `TestInterfaceNegotiation` covers both paths and a 3.0-only module.
+
 ### Changed
 
 - Build and test toolchain bumped from `go1.27.1` to `go1.27.2` (`toolchain` directive in
