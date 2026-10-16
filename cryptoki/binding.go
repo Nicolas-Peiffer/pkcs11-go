@@ -38,6 +38,11 @@ var errClosed = errors.New("cryptoki: module is closed")
 type Ctx struct {
 	mu     sync.RWMutex
 	module *C.ckModule
+	// waiters counts blocking WaitForSlotEvent calls in flight. They run
+	// without holding mu so that Finalize — the spec's only way to wake them —
+	// can take the write lock; Destroy waits on this before unloading the
+	// library they are still executing in.
+	waiters sync.WaitGroup
 }
 
 // New loads the PKCS #11 module shared object at path (e.g. a vendor driver or
@@ -83,7 +88,9 @@ func (c *Ctx) grab() (*C.ckModule, func(), error) {
 }
 
 // Destroy unloads the module and closes the shared library. It does not call
-// Finalize; call Finalize before Destroy. Destroy is idempotent.
+// Finalize; call Finalize before Destroy. Destroy is idempotent. It waits for
+// any blocking WaitForSlotEvent to return first, so call Finalize (which wakes
+// them) before Destroy.
 func (c *Ctx) Destroy() {
 	if c == nil {
 		return
@@ -93,6 +100,7 @@ func (c *Ctx) Destroy() {
 	if c.module == nil {
 		return
 	}
+	c.waiters.Wait()
 	C.ck_unload(c.module)
 	c.module = nil
 }
