@@ -47,6 +47,9 @@ func (c *Ctx) EncapsulateKey(sh SessionHandle, m *Mechanism, pubKey ObjectHandle
 
 	var buf unsafe.Pointer
 	var ctPtr C.CK_BYTE_PTR
+	// allocLen is the capacity of buf. Keep it apart from ctLen, which the data
+	// pass overwrites with whatever length the module reports.
+	allocLen := ctLen
 	if ctLen > 0 {
 		// ctLen is module-reported. Bound it by maxOutBuf (as outOp does) and
 		// by the C.int range C.GoBytes accepts, so a bogus length cannot drive
@@ -65,6 +68,14 @@ func (c *Ctx) EncapsulateKey(sh SessionHandle, m *Mechanism, pubKey ObjectHandle
 		C.CK_OBJECT_HANDLE(pubKey), arr, n, ctPtr, &ctLen, &key)
 	if err := toError(uint(rv)); err != nil {
 		return nil, 0, err
+	}
+	// A successful data pass must not report more ciphertext than the buffer
+	// it was given; C.GoBytes would otherwise read past the allocation (or
+	// from NULL when the sizing pass reported zero). The module has already
+	// created the key, so destroy it rather than hand back an orphan.
+	if ctLen > allocLen {
+		_ = C.ck_destroy_object(mod, C.CK_SESSION_HANDLE(sh), key)
+		return nil, 0, fmt.Errorf("cryptoki: EncapsulateKey: module reported ciphertext size %d exceeding buffer %d", uint64(ctLen), uint64(allocLen))
 	}
 	var ct []byte
 	if ctLen > 0 {
