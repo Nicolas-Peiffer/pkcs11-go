@@ -167,3 +167,19 @@ func TestInfoULong(t *testing.T) {
 		t.Fatalf("infoULong(32-bit ~0) = %#x, want CK_UNAVAILABLE_INFORMATION", got)
 	}
 }
+
+func TestIsArrayAttribute(t *testing.T) {
+	for _, typ := range []uint{
+		CKA_WRAP_TEMPLATE, CKA_UNWRAP_TEMPLATE, CKA_DERIVE_TEMPLATE,
+		CKA_ALLOWED_MECHANISMS, CKA_ENCAPSULATE_TEMPLATE, CKA_DECAPSULATE_TEMPLATE,
+	} {
+		if !isArrayAttribute(typ) {
+			t.Errorf("isArrayAttribute(%#x) = false, want true", typ)
+		}
+	}
+	for _, typ := range []uint{CKA_CLASS, CKA_VALUE, CKA_LABEL, CKA_ENCAPSULATE, CKA_DECAPSULATE} {
+		if isArrayAttribute(typ) {
+			t.Errorf("isArrayAttribute(%#x) = true, want false", typ)
+		}
+	}
+}
