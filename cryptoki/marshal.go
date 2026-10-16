@@ -145,12 +145,19 @@ func ckBBool(b bool) []byte {
 // cMechanism builds a CK_MECHANISM from m and returns a pointer plus a free
 // func. A nil m yields a nil pointer (for calls that take no mechanism).
 //
+// It is the point every operation passes a Mechanism to the module, so it
+// enforces the installed mechanism policy (see checkMechanismUse) and returns
+// the policy's error without allocating anything.
+//
 // A structured parameter (m.params) is marshalled into C memory by its build
 // method, which also owns the cleanup of any nested pointers; otherwise the raw
 // Parameter bytes are copied. Either way the returned free releases everything.
-func cMechanism(m *Mechanism) (C.CK_MECHANISM_PTR, func()) {
+func cMechanism(m *Mechanism) (C.CK_MECHANISM_PTR, func(), error) {
 	if m == nil {
-		return nil, func() {}
+		return nil, func() {}, nil
+	}
+	if err := checkMechanismUse(m); err != nil {
+		return nil, nil, err
 	}
 	mech := (*C.CK_MECHANISM)(cMalloc(C.size_t(unsafe.Sizeof(C.CK_MECHANISM{}))))
 	mech.mechanism = C.CK_MECHANISM_TYPE(m.Mechanism)
@@ -162,7 +169,7 @@ func cMechanism(m *Mechanism) (C.CK_MECHANISM_PTR, func()) {
 		return mech, func() {
 			freeParam()
 			C.free(unsafe.Pointer(mech))
-		}
+		}, nil
 	}
 
 	param, plen := cBytes(m.Parameter)
@@ -172,7 +179,7 @@ func cMechanism(m *Mechanism) (C.CK_MECHANISM_PTR, func()) {
 		// A mechanism parameter may carry sensitive values (e.g. an IV); scrub it.
 		zfree(param, plen)
 		C.free(unsafe.Pointer(mech))
-	}
+	}, nil
 }
 
 // cAttributes builds a C array of CK_ATTRIBUTE from a Go template and returns

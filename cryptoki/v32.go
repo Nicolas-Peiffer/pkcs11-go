@@ -30,7 +30,10 @@ func (c *Ctx) EncapsulateKey(sh SessionHandle, m *Mechanism, pubKey ObjectHandle
 		return nil, 0, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return nil, 0, err
+	}
 	defer freeMech()
 	arr, n, freeAttrs := cAttributes(tmpl)
 	defer freeAttrs()
@@ -94,7 +97,10 @@ func (c *Ctx) DecapsulateKey(sh SessionHandle, m *Mechanism, privKey ObjectHandl
 		return 0, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return 0, err
+	}
 	defer freeMech()
 	arr, n, freeAttrs := cAttributes(tmpl)
 	defer freeAttrs()
@@ -119,7 +125,10 @@ func (c *Ctx) VerifySignatureInit(sh SessionHandle, m *Mechanism, key ObjectHand
 		return err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return err
+	}
 	defer freeMech()
 	sig, sn := cInput(signature)
 	defer free(sig)
@@ -191,7 +200,10 @@ func (c *Ctx) WrapKeyAuthenticated(sh SessionHandle, m *Mechanism, wrappingKey, 
 		return nil, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return nil, err
+	}
 	defer freeMech()
 	ad, adLen := cInput(aad)
 	defer free(ad)
@@ -211,7 +223,10 @@ func (c *Ctx) UnwrapKeyAuthenticated(sh SessionHandle, m *Mechanism, unwrappingK
 		return 0, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return 0, err
+	}
 	defer freeMech()
 	wp, wn := cInput(wrapped)
 	defer free(wp)

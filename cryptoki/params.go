@@ -199,6 +199,11 @@ func NewOAEPParams(hashAlg, mgf, source uint, sourceData []byte) MechanismParams
 	return &oaepParams{hashAlg: hashAlg, mgf: mgf, source: source, sourceData: sourceData}
 }
 
+// hashMechanisms reports the digests OAEP runs on, for the mechanism policy.
+func (p *oaepParams) hashMechanisms() []uint {
+	return withMGFHash([]uint{p.hashAlg}, p.mgf)
+}
+
 func (p *oaepParams) build() (unsafe.Pointer, C.CK_ULONG, func()) {
 	op := (*C.CK_RSA_PKCS_OAEP_PARAMS)(cMalloc(C.size_t(unsafe.Sizeof(C.CK_RSA_PKCS_OAEP_PARAMS{}))))
 	src, srcLen := cBytes(p.sourceData)
@@ -234,6 +239,19 @@ func NewPSSParams(hashAlg, mgf uint, saltLen int) MechanismParams {
 	return &pssParams{hashAlg: hashAlg, mgf: mgf, saltLen: saltLen}
 }
 
+// hashMechanisms reports the digests PSS runs on, for the mechanism policy.
+func (p *pssParams) hashMechanisms() []uint {
+	return withMGFHash([]uint{p.hashAlg}, p.mgf)
+}
+
+// withMGFHash appends the digest behind mgf to hashes, when it has one.
+func withMGFHash(hashes []uint, mgf uint) []uint {
+	if h, ok := mgfHash[mgf]; ok {
+		hashes = append(hashes, h)
+	}
+	return hashes
+}
+
 func (p *pssParams) build() (unsafe.Pointer, C.CK_ULONG, func()) {
 	pp := (*C.CK_RSA_PKCS_PSS_PARAMS)(cMalloc(C.size_t(unsafe.Sizeof(C.CK_RSA_PKCS_PSS_PARAMS{}))))
 	pp.hashAlg = C.CK_MECHANISM_TYPE(p.hashAlg)
@@ -257,6 +275,15 @@ type ecdh1Params struct {
 // shared data, and the other party's public EC point (publicData).
 func NewECDH1DeriveParams(kdf uint, sharedData, publicData []byte) MechanismParams {
 	return &ecdh1Params{kdf: kdf, sharedData: sharedData, publicData: publicData}
+}
+
+// hashMechanisms reports the digest the ECDH1 KDF runs on, for the mechanism
+// policy. CKD_NULL has none.
+func (p *ecdh1Params) hashMechanisms() []uint {
+	if h, ok := kdfHash[p.kdf]; ok {
+		return []uint{h}
+	}
+	return nil
 }
 
 func (p *ecdh1Params) build() (unsafe.Pointer, C.CK_ULONG, func()) {

@@ -75,12 +75,14 @@ func NewMechanism(mechanism uint, parameter []byte) *Mechanism {
 // NewMechanismWithParams returns a Mechanism whose parameter is a structured
 // CK_*_PARAMS value built by one of the NewGCMParams / NewOAEPParams /
 // NewECDH1DeriveParams / NewPSSParams constructors. A mechanism policy, if
-// installed, is consulted as in NewMechanism.
+// installed, is consulted as in NewMechanism, for the mechanism and for the
+// digests the parameter names.
 func NewMechanismWithParams(mechanism uint, params MechanismParams) *Mechanism {
-	if err := checkMechanism(mechanism); err != nil {
+	m := &Mechanism{Mechanism: mechanism, params: params}
+	if err := checkMechanismUse(m); err != nil {
 		panic(err)
 	}
-	return &Mechanism{Mechanism: mechanism, params: params}
+	return m
 }
 
 // Attribute is one object attribute (CK_ATTRIBUTE): a CKA_ type and its raw

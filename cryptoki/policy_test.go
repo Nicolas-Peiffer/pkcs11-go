@@ -118,3 +118,78 @@ func TestMechanismPolicyFuncError(t *testing.T) {
 		t.Errorf("Allow = %v, want %v", err, sentinel)
 	}
 }
+
+// TestCMechanismEnforcesPolicyOnLiteral checks that a Mechanism built as a
+// struct literal, which skips the constructors, is still rejected when it is
+// marshalled for an operation.
+func TestCMechanismEnforcesPolicyOnLiteral(t *testing.T) {
+	SetMechanismPolicy(MechanismPolicyFunc(RejectWeakMechanisms))
+	t.Cleanup(func() { SetMechanismPolicy(nil) })
+
+	mech, freeMech, err := cMechanism(&Mechanism{Mechanism: CKM_MD5})
+	if err == nil {
+		freeMech()
+		t.Fatal("cMechanism(&Mechanism{MD5}) = nil error under RejectWeakMechanisms")
+	}
+	if mech != nil {
+		t.Errorf("cMechanism returned a mechanism alongside the policy error")
+	}
+}
+
+// TestCMechanismAllowsStrongUnderPolicy checks a strong mechanism still
+// marshals when the policy is installed.
+func TestCMechanismAllowsStrongUnderPolicy(t *testing.T) {
+	SetMechanismPolicy(MechanismPolicyFunc(RejectWeakMechanisms))
+	t.Cleanup(func() { SetMechanismPolicy(nil) })
+
+	mech, freeMech, err := cMechanism(&Mechanism{Mechanism: CKM_AES_CBC_PAD, Parameter: make([]byte, 16)})
+	if err != nil {
+		t.Fatalf("cMechanism(AES_CBC_PAD) = %v, want nil", err)
+	}
+	defer freeMech()
+	if mech == nil {
+		t.Fatal("cMechanism(AES_CBC_PAD) returned a nil mechanism")
+	}
+}
+
+// TestPolicyChecksParameterHashes checks that the digests named inside a
+// structured parameter are judged by the policy, so a strong outer mechanism
+// cannot carry a weak hash, MGF or KDF.
+func TestPolicyChecksParameterHashes(t *testing.T) {
+	SetMechanismPolicy(MechanismPolicyFunc(RejectWeakMechanisms))
+	t.Cleanup(func() { SetMechanismPolicy(nil) })
+
+	weak := map[string]*Mechanism{
+		"OAEP hash SHA-1":  {Mechanism: CKM_RSA_PKCS_OAEP, params: NewOAEPParams(CKM_SHA_1, CKG_MGF1_SHA256, CKZ_DATA_SPECIFIED, nil)},
+		"OAEP MGF1-SHA1":   {Mechanism: CKM_RSA_PKCS_OAEP, params: NewOAEPParams(CKM_SHA256, CKG_MGF1_SHA1, CKZ_DATA_SPECIFIED, nil)},
+		"PSS hash SHA-1":   {Mechanism: CKM_RSA_PKCS_PSS, params: NewPSSParams(CKM_SHA_1, CKG_MGF1_SHA256, 32)},
+		"PSS MGF1-SHA1":    {Mechanism: CKM_RSA_PKCS_PSS, params: NewPSSParams(CKM_SHA256, CKG_MGF1_SHA1, 32)},
+		"ECDH1 SHA-1 KDF":  {Mechanism: CKM_ECDH1_DERIVE, params: NewECDH1DeriveParams(CKD_SHA1_KDF, nil, []byte{4})},
+		"ECDH1 SP800 SHA1": {Mechanism: CKM_ECDH1_DERIVE, params: NewECDH1DeriveParams(CKD_SHA1_KDF_SP800, nil, []byte{4})},
+	}
+	for name, m := range weak {
+		if err := checkMechanismUse(m); err == nil {
+			t.Errorf("%s: checkMechanismUse = nil, want policy error", name)
+		}
+	}
+
+	strong := map[string]*Mechanism{
+		"OAEP SHA-256":    {Mechanism: CKM_RSA_PKCS_OAEP, params: NewOAEPParams(CKM_SHA256, CKG_MGF1_SHA256, CKZ_DATA_SPECIFIED, nil)},
+		"PSS SHA-384":     {Mechanism: CKM_RSA_PKCS_PSS, params: NewPSSParams(CKM_SHA384, CKG_MGF1_SHA384, 48)},
+		"ECDH1 CKD_NULL":  {Mechanism: CKM_ECDH1_DERIVE, params: NewECDH1DeriveParams(CKD_NULL, nil, []byte{4})},
+		"ECDH1 SHA-256":   {Mechanism: CKM_ECDH1_DERIVE, params: NewECDH1DeriveParams(CKD_SHA256_KDF, nil, []byte{4})},
+		"GCM (no hashes)": {Mechanism: CKM_AES_GCM, params: nil},
+	}
+	for name, m := range strong {
+		if err := checkMechanismUse(m); err != nil {
+			t.Errorf("%s: checkMechanismUse = %v, want nil", name, err)
+		}
+	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("NewMechanismWithParams(OAEP, SHA-1) did not panic under RejectWeakMechanisms")
+		}
+	}()
+	_ = NewMechanismWithParams(CKM_RSA_PKCS_OAEP, NewOAEPParams(CKM_SHA_1, CKG_MGF1_SHA1, CKZ_DATA_SPECIFIED, nil))
+}
