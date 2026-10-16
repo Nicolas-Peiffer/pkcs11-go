@@ -217,4 +217,20 @@ func TestMLKEMEncapsulateDecapsulate(t *testing.T) {
 	if !bytes.Equal(got, probe) {
 		t.Fatal("ML-KEM shared secret mismatch via p11 layer")
 	}
+
+	// The shared-secret template sets neither CKA_SENSITIVE nor
+	// CKA_EXTRACTABLE, so both keys must carry the p11 secure defaults rather
+	// than the token's own defaults.
+	for name, k := range map[string]SecretKey{"encapsulated": encKey, "decapsulated": decKey} {
+		attrs, err := k.Object().Attributes(cryptoki.CKA_SENSITIVE, cryptoki.CKA_EXTRACTABLE)
+		if err != nil {
+			t.Fatalf("%s key attributes: %v", name, err)
+		}
+		if !bytes.Equal(attrs[0].Value, []byte{1}) {
+			t.Errorf("%s key CKA_SENSITIVE = %v, want true", name, attrs[0].Value)
+		}
+		if !bytes.Equal(attrs[1].Value, []byte{0}) {
+			t.Errorf("%s key CKA_EXTRACTABLE = %v, want false", name, attrs[1].Value)
+		}
+	}
 }

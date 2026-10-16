@@ -75,13 +75,15 @@ func (k SecretKey) Wrap(mechanism *cryptoki.Mechanism, key Object) ([]byte, erro
 }
 
 // Unwrap unwraps a key with this secret key into a new object (C_UnwrapKey).
+// Secure defaults (CKA_SENSITIVE, CKA_EXTRACTABLE, CKA_PRIVATE) are added for
+// any the template does not set (P11).
 func (k SecretKey) Unwrap(mechanism *cryptoki.Mechanism, wrapped []byte, template []*cryptoki.Attribute) (Object, error) {
 	k.session.mu.Lock()
 	defer k.session.mu.Unlock()
 	if err := k.session.checkOpen(); err != nil {
 		return Object{}, err
 	}
-	h, err := k.session.ctx.UnwrapKey(k.session.handle, mechanism, k.handle, wrapped, template)
+	h, err := k.session.ctx.UnwrapKey(k.session.handle, mechanism, k.handle, wrapped, withSecureDefaults(template, true))
 	if err != nil {
 		return Object{}, err
 	}
@@ -133,13 +135,15 @@ func (k PublicKey) VerifyStateless(mechanism *cryptoki.Mechanism, message, signa
 
 // Encapsulate runs a KEM encapsulation under the public key, returning the
 // ciphertext and the freshly created shared-secret key (C_EncapsulateKey).
+// Secure defaults (CKA_SENSITIVE, CKA_EXTRACTABLE, CKA_PRIVATE) are added to
+// the shared-secret template for any it does not set (P11).
 func (k PublicKey) Encapsulate(mechanism *cryptoki.Mechanism, derivedKeyTemplate []*cryptoki.Attribute) ([]byte, SecretKey, error) {
 	k.session.mu.Lock()
 	defer k.session.mu.Unlock()
 	if err := k.session.checkOpen(); err != nil {
 		return nil, SecretKey{}, err
 	}
-	ct, h, err := k.session.ctx.EncapsulateKey(k.session.handle, mechanism, k.handle, derivedKeyTemplate)
+	ct, h, err := k.session.ctx.EncapsulateKey(k.session.handle, mechanism, k.handle, withSecureDefaults(derivedKeyTemplate, true))
 	if err != nil {
 		return nil, SecretKey{}, err
 	}
@@ -175,13 +179,15 @@ func (k PrivateKey) Decrypt(mechanism *cryptoki.Mechanism, ciphertext []byte) ([
 }
 
 // Derive derives a new key from this private key (C_DeriveKey), e.g. ECDH1.
+// Secure defaults (CKA_SENSITIVE, CKA_EXTRACTABLE, CKA_PRIVATE) are added for
+// any the template does not set (P11).
 func (k PrivateKey) Derive(mechanism *cryptoki.Mechanism, template []*cryptoki.Attribute) (SecretKey, error) {
 	k.session.mu.Lock()
 	defer k.session.mu.Unlock()
 	if err := k.session.checkOpen(); err != nil {
 		return SecretKey{}, err
 	}
-	h, err := k.session.ctx.DeriveKey(k.session.handle, mechanism, k.handle, template)
+	h, err := k.session.ctx.DeriveKey(k.session.handle, mechanism, k.handle, withSecureDefaults(template, true))
 	if err != nil {
 		return SecretKey{}, err
 	}
@@ -189,14 +195,16 @@ func (k PrivateKey) Derive(mechanism *cryptoki.Mechanism, template []*cryptoki.A
 }
 
 // Decapsulate recovers the shared-secret key from ciphertext with the private
-// key (C_DecapsulateKey).
+// key (C_DecapsulateKey). Secure defaults (CKA_SENSITIVE, CKA_EXTRACTABLE,
+// CKA_PRIVATE) are added to the shared-secret template for any it does not
+// set (P11).
 func (k PrivateKey) Decapsulate(mechanism *cryptoki.Mechanism, ciphertext []byte, derivedKeyTemplate []*cryptoki.Attribute) (SecretKey, error) {
 	k.session.mu.Lock()
 	defer k.session.mu.Unlock()
 	if err := k.session.checkOpen(); err != nil {
 		return SecretKey{}, err
 	}
-	h, err := k.session.ctx.DecapsulateKey(k.session.handle, mechanism, k.handle, derivedKeyTemplate, ciphertext)
+	h, err := k.session.ctx.DecapsulateKey(k.session.handle, mechanism, k.handle, withSecureDefaults(derivedKeyTemplate, true), ciphertext)
 	if err != nil {
 		return SecretKey{}, err
 	}
