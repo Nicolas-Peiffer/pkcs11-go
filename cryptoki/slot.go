@@ -112,6 +112,24 @@ func (c *Ctx) GetSlotInfo(slot SlotID) (SlotInfo, error) {
 	}, nil
 }
 
+// ulongUnavailable is CK_UNAVAILABLE_INFORMATION as a module writes it: ~0 in
+// the width of the platform's CK_ULONG, so 0xFFFFFFFF on Windows (LLP64) and
+// 0xFFFFFFFFFFFFFFFF on LP64. It is a variable only so a test can stand in for
+// the other width.
+var ulongUnavailable = uint(C.CK_ULONG(C.CK_UNAVAILABLE_INFORMATION))
+
+// infoULong converts a CK_ULONG that may hold CK_UNAVAILABLE_INFORMATION. The
+// Go constant CK_UNAVAILABLE_INFORMATION is ^uint(0), 64 bits wide everywhere,
+// while a 32-bit ~0 widened with uint() is 0x00000000FFFFFFFF on Windows and
+// never equals it. This maps the module's marker onto the Go constant, so that
+// comparing a field against CK_UNAVAILABLE_INFORMATION works on every platform.
+func infoULong(v uint) uint {
+	if v == ulongUnavailable {
+		return CK_UNAVAILABLE_INFORMATION
+	}
+	return v
+}
+
 // GetTokenInfo returns information about the token in a slot (C_GetTokenInfo).
 func (c *Ctx) GetTokenInfo(slot SlotID) (TokenInfo, error) {
 	m, release, err := c.grab()
@@ -129,16 +147,16 @@ func (c *Ctx) GetTokenInfo(slot SlotID) (TokenInfo, error) {
 		Model:              goPaddedString(unsafe.Pointer(&info.model[0]), len(info.model)),
 		SerialNumber:       goPaddedString(unsafe.Pointer(&info.serialNumber[0]), len(info.serialNumber)),
 		Flags:              uint(info.flags),
-		MaxSessionCount:    uint(info.ulMaxSessionCount),
-		SessionCount:       uint(info.ulSessionCount),
-		MaxRwSessionCount:  uint(info.ulMaxRwSessionCount),
-		RwSessionCount:     uint(info.ulRwSessionCount),
+		MaxSessionCount:    infoULong(uint(info.ulMaxSessionCount)),
+		SessionCount:       infoULong(uint(info.ulSessionCount)),
+		MaxRwSessionCount:  infoULong(uint(info.ulMaxRwSessionCount)),
+		RwSessionCount:     infoULong(uint(info.ulRwSessionCount)),
 		MaxPinLen:          uint(info.ulMaxPinLen),
 		MinPinLen:          uint(info.ulMinPinLen),
-		TotalPublicMemory:  uint(info.ulTotalPublicMemory),
-		FreePublicMemory:   uint(info.ulFreePublicMemory),
-		TotalPrivateMemory: uint(info.ulTotalPrivateMemory),
-		FreePrivateMemory:  uint(info.ulFreePrivateMemory),
+		TotalPublicMemory:  infoULong(uint(info.ulTotalPublicMemory)),
+		FreePublicMemory:   infoULong(uint(info.ulFreePublicMemory)),
+		TotalPrivateMemory: infoULong(uint(info.ulTotalPrivateMemory)),
+		FreePrivateMemory:  infoULong(uint(info.ulFreePrivateMemory)),
 		HardwareVersion:    goVersion(info.hardwareVersion),
 		FirmwareVersion:    goVersion(info.firmwareVersion),
 		UTCTime:            goPaddedString(unsafe.Pointer(&info.utcTime[0]), len(info.utcTime)),
