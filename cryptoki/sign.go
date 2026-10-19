@@ -28,7 +28,7 @@ func (c *Ctx) Sign(sh SessionHandle, data []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer release()
-	p, n := cBytes(data)
+	p, n := cInput(data)
 	defer zfree(p, n)
 	return outOp(func(out C.CK_BYTE_PTR, outLen *C.CK_ULONG) C.CK_RV {
 		return C.ck_sign(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(p), n, out, outLen)
@@ -43,15 +43,7 @@ func (c *Ctx) SignUpdate(sh SessionHandle, part []byte) error {
 		return err
 	}
 	defer release()
-	if len(part) == 0 {
-		// Some PKCS#11 implementations (e.g. SoftHSM2) reject a NULL pPart
-		// pointer even when ulPartLen is 0. Allocate a 1-byte dummy buffer so
-		// the pointer is valid while still signalling zero-length input.
-		dummy := C.malloc(1)
-		defer C.free(dummy)
-		return toError(uint(C.ck_sign_update(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(dummy), 0)))
-	}
-	p, n := cBytes(part)
+	p, n := cInput(part)
 	defer zfree(p, n)
 	return toError(uint(C.ck_sign_update(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(p), n)))
 }
@@ -90,9 +82,9 @@ func (c *Ctx) Verify(sh SessionHandle, data, signature []byte) error {
 		return err
 	}
 	defer release()
-	p, n := cBytes(data)
+	p, n := cInput(data)
 	defer zfree(p, n)
-	sig, sn := cBytes(signature)
+	sig, sn := cInput(signature)
 	defer free(sig)
 	rv := C.ck_verify(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(p), n, (C.CK_BYTE_PTR)(sig), sn)
 	return toError(uint(rv))
@@ -106,14 +98,7 @@ func (c *Ctx) VerifyUpdate(sh SessionHandle, part []byte) error {
 		return err
 	}
 	defer release()
-	if len(part) == 0 {
-		// Same NULL-pointer guard as SignUpdate: some implementations reject
-		// NULL pPart even when ulPartLen is 0.
-		dummy := C.malloc(1)
-		defer C.free(dummy)
-		return toError(uint(C.ck_verify_update(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(dummy), 0)))
-	}
-	p, n := cBytes(part)
+	p, n := cInput(part)
 	defer zfree(p, n)
 	return toError(uint(C.ck_verify_update(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(p), n)))
 }
@@ -126,7 +111,7 @@ func (c *Ctx) VerifyFinal(sh SessionHandle, signature []byte) error {
 		return err
 	}
 	defer release()
-	sig, sn := cBytes(signature)
+	sig, sn := cInput(signature)
 	defer free(sig)
 	return toError(uint(C.ck_verify_final(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(sig), sn)))
 }

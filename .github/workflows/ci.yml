@@ -36,8 +36,8 @@ jobs:
       - name: Verify generated constants are up to date
         run: |
           make generate
-          git diff --exit-code -- cryptoki/zconst.go \
-            || { echo "::error::cryptoki/zconst.go is stale; run 'make generate' and commit."; exit 1; }
+          git diff --exit-code -- cryptoki/zconst.go cryptoki/zerror.go cryptoki/zattr.go \
+            || { echo "::error::generated files in cryptoki/ are stale; run 'make generate' and commit."; exit 1; }
 
       - name: go vet
         run: go vet ./...

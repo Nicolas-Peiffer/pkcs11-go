@@ -90,3 +90,19 @@ type Attribute struct {
 	Type  uint
 	Value []byte
 }
+
+// AttributeName returns the CKA_ symbol the OASIS PKCS #11 v3.2 header defines
+// for an attribute type, e.g. "CKA_LABEL" for CKA_LABEL, for use in logs and
+// error messages. A type the header does not name — a vendor-defined attribute,
+// say — is rendered as a hex code such as "0x80000001".
+//
+// Where the header gives one value two names, the current one is returned:
+// "CKA_EC_PARAMS" rather than the deprecated "CKA_ECDSA_PARAMS", and
+// "CKA_SUBPRIME_BITS" rather than its alias "CKA_SUB_PRIME_BITS". The names come
+// from the generated table ckaNames (see zattr.go).
+func AttributeName(t uint) string {
+	if name, ok := ckaNames[t]; ok {
+		return name
+	}
+	return fmt.Sprintf("0x%08X", t)
+}
