@@ -283,12 +283,20 @@ func (c *Ctx) SetPIN(sh SessionHandle, oldPin, newPin []byte) error {
 // occurs, then returns the affected slot ID (C_WaitForSlotEvent). Pass
 // CKF_DONT_BLOCK (= 1) to return immediately: when no event is pending the
 // error will be CKR_NO_EVENT (= 0x00000008).
+//
+// A blocking wait does not hold the Ctx lock while it is parked in the module,
+// so another goroutine can call Finalize to wake it, as the specification
+// prescribes; the wait then returns CKR_CRYPTOKI_NOT_INITIALIZED.
 func (c *Ctx) WaitForSlotEvent(flags uint) (SlotID, error) {
 	m, release, err := c.grab()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+	// Register as a waiter while still holding the read lock (ordering the
+	// Add before any Destroy's Wait), then drop the lock for the call itself.
+	c.waiters.Add(1)
+	release()
+	defer c.waiters.Done()
 	var slot C.CK_SLOT_ID
 	rv := C.ck_wait_for_slot_event(m, C.CK_FLAGS(flags), &slot)
 	if err := toError(uint(rv)); err != nil {
