@@ -16,6 +16,12 @@ independent of the PKCS #11 specification revision the binding targets, which is
 
 ## [Unreleased]
 
+### Added
+
+- `SECURITY.md`: how to report a vulnerability privately (GitHub private vulnerability
+  reporting or the Eclipse Foundation security team), which versions receive fixes, and what
+  is in scope for a binding that loads native PKCS #11 modules.
+
 ### Changed
 
 - Build and test toolchain bumped from `go1.27.1` to `go1.27.2` (`toolchain` directive in
@@ -28,6 +34,15 @@ independent of the PKCS #11 specification revision the binding targets, which is
   export data (version 5 is greater than the maximum supported version 4) and fails the
   scan with an import error. Move back to a tagged release once one ships
   `x/tools` >= v0.50.0.
+
+### Fixed
+
+- **`CK_UNAVAILABLE_INFORMATION` on Windows.** A module writes it as ~0 in the width of
+  `CK_ULONG`, which is 32 bits on Windows, while the Go constant is `^uint(0)`, 64 bits
+  everywhere. The session counters and memory fields of `TokenInfo`, and the result of
+  `GetObjectSize`, therefore never compared equal to `CK_UNAVAILABLE_INFORMATION` on Windows:
+  a token reporting "unavailable" read as 4294967295. Those values are now mapped to the Go
+  constant on every platform.
 
 ## [1.2.0-rc2] - 2026-10-06
 

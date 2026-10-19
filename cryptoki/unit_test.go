@@ -121,3 +121,25 @@ func TestBytesToULongWidths(t *testing.T) {
 		t.Fatal("a value longer than a CK_ULONG was not truncated")
 	}
 }
+
+// TestInfoULong checks that CK_UNAVAILABLE_INFORMATION written by the module
+// compares equal to the Go constant, at this platform's CK_ULONG width and at
+// the 32-bit width of Windows' LLP64 model.
+func TestInfoULong(t *testing.T) {
+	if got := infoULong(ulongUnavailable); got != CK_UNAVAILABLE_INFORMATION {
+		t.Fatalf("infoULong(native ~0) = %#x, want CK_UNAVAILABLE_INFORMATION", got)
+	}
+	if got := infoULong(42); got != 42 {
+		t.Fatalf("infoULong(42) = %d, want 42", got)
+	}
+	if got := infoULong(CK_EFFECTIVELY_INFINITE); got != CK_EFFECTIVELY_INFINITE {
+		t.Fatalf("infoULong(CK_EFFECTIVELY_INFINITE) = %#x, want it unchanged", got)
+	}
+
+	saved := ulongUnavailable
+	ulongUnavailable = 0xFFFFFFFF // a 32-bit CK_ULONG
+	defer func() { ulongUnavailable = saved }()
+	if got := infoULong(0xFFFFFFFF); got != CK_UNAVAILABLE_INFORMATION {
+		t.Fatalf("infoULong(32-bit ~0) = %#x, want CK_UNAVAILABLE_INFORMATION", got)
+	}
+}
