@@ -111,7 +111,7 @@ func (c *Ctx) GetObjectSize(sh SessionHandle, obj ObjectHandle) (uint, error) {
 	if err := toError(uint(rv)); err != nil {
 		return 0, err
 	}
-	return uint(size), nil
+	return infoULong(uint(size)), nil
 }
 
 // GetAttributeValue reads attribute values for an object (C_GetAttributeValue).
