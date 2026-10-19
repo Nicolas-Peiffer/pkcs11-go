@@ -33,7 +33,7 @@ func (c *Ctx) SetOperationState(sh SessionHandle, state []byte, encKey, authKey 
 		return err
 	}
 	defer release()
-	sp, slen := cBytes(state)
+	sp, slen := cInput(state)
 	defer zfree(sp, slen)
 	rv := C.ck_set_operation_state(m, C.CK_SESSION_HANDLE(sh),
 		(C.CK_BYTE_PTR)(sp), slen,

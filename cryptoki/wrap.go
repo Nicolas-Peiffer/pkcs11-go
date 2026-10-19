@@ -34,7 +34,7 @@ func (c *Ctx) UnwrapKey(sh SessionHandle, m *Mechanism, unwrappingKey ObjectHand
 	defer release()
 	mech, freeMech := cMechanism(m)
 	defer freeMech()
-	wp, wn := cBytes(wrapped)
+	wp, wn := cInput(wrapped)
 	defer free(wp)
 	arr, n, freeAttrs := cAttributes(tmpl)
 	defer freeAttrs()

@@ -40,6 +40,24 @@ func cBytes(b []byte) (unsafe.Pointer, C.CK_ULONG) {
 	return C.CBytes(b), C.CK_ULONG(len(b))
 }
 
+// cInput is cBytes for the data a Cryptoki call consumes: a message, a
+// ciphertext, a signature, associated data. It never returns NULL. An empty
+// slice gets a one-byte allocation, so the module sees a valid pointer with a
+// zero length. PKCS #11 does not say that a NULL buffer is acceptable when the
+// length is 0, and modules differ: SoftHSM2 rejects it with CKR_ARGUMENTS_BAD,
+// which makes a legitimate empty input — the digest of "", AES-GCM over
+// associated data only — impossible. The caller frees the pointer as with
+// cBytes.
+//
+// Keep cBytes where NULL means "absent": a mechanism parameter or attribute
+// value, and a PIN, where NULL selects the protected authentication path.
+func cInput(b []byte) (unsafe.Pointer, C.CK_ULONG) {
+	if len(b) == 0 {
+		return cMalloc(1), 0
+	}
+	return C.CBytes(b), C.CK_ULONG(len(b))
+}
+
 // zfree scrubs n bytes at p (defeating dead-store elimination) and frees it.
 // It is a no-op on a nil pointer. Use it instead of free for any C buffer that
 // held secret material: a PIN, plaintext, key bytes, or a sensitive attribute.
