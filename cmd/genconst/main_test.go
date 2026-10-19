@@ -112,3 +112,48 @@ func TestRenderErrorsOnlyCKR(t *testing.T) {
 		t.Error("renderErrors emitted a non-CKR name")
 	}
 }
+
+// TestRenderAttributesOneNamePerValue checks that the CKA name table holds only
+// CKA_ names and resolves a shared value to one name: an alias never displaces
+// the name it aliases, and a later literal definition supersedes an earlier one.
+func TestRenderAttributesOneNamePerValue(t *testing.T) {
+	defs := []define{
+		{name: "CKF_ARRAY_ATTRIBUTE", value: "0x40000000"},
+		{name: "CKA_CLASS", value: "0x00000000"},
+		{name: "CKA_SUBPRIME_BITS", value: "0x00000134"},
+		{name: "CKA_SUB_PRIME_BITS", value: "CKA_SUBPRIME_BITS"},
+		{name: "CKA_ECDSA_PARAMS", value: "0x00000180"},
+		{name: "CKA_EC_PARAMS", value: "0x00000180"},
+		{name: "CKA_WRAP_TEMPLATE", value: "(CKF_ARRAY_ATTRIBUTE | 0x00000211)"},
+		{name: "CKM_AES_CBC", value: "0x00001082"},
+	}
+	src, n, err := renderAttributes("cryptoki", "pkcs11t.h", defs)
+	if err != nil {
+		t.Fatalf("renderAttributes: %v", err)
+	}
+	if n != 4 {
+		t.Errorf("renderAttributes counted %d, want 4", n)
+	}
+	got := string(src)
+	for _, want := range []string{`CKA_SUBPRIME_BITS: "CKA_SUBPRIME_BITS"`, `CKA_EC_PARAMS: "CKA_EC_PARAMS"`, `CKA_WRAP_TEMPLATE: "CKA_WRAP_TEMPLATE"`} {
+		if !strings.Contains(strings.Join(strings.Fields(got), " "), want) {
+			t.Errorf("renderAttributes output lacks %s", want)
+		}
+	}
+	for _, unwanted := range []string{"CKA_SUB_PRIME_BITS", "CKA_ECDSA_PARAMS", "CKM_AES_CBC"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("renderAttributes emitted %s", unwanted)
+		}
+	}
+}
+
+// TestRenderAttributesRejectsUnevaluable checks that a CKA_ define whose value
+// cannot be computed fails generation instead of vanishing from the table.
+func TestRenderAttributesRejectsUnevaluable(t *testing.T) {
+	defs := []define{
+		{name: "CKA_MYSTERY", value: "(CKF_UNDEFINED | 0x1)"},
+	}
+	if _, _, err := renderAttributes("cryptoki", "pkcs11t.h", defs); err == nil {
+		t.Fatal("renderAttributes accepted an unevaluable CKA_ value, want error")
+	}
+}

@@ -24,6 +24,30 @@ func TestVersionString(t *testing.T) {
 	}
 }
 
+func TestAttributeName(t *testing.T) {
+	cases := []struct {
+		typ  uint
+		want string
+	}{
+		{CKA_CLASS, "CKA_CLASS"},
+		{CKA_LABEL, "CKA_LABEL"},
+		{CKA_WRAP_TEMPLATE, "CKA_WRAP_TEMPLATE"},
+		{CKA_SEED, "CKA_SEED"},
+		{CKA_VENDOR_DEFINED, "CKA_VENDOR_DEFINED"},
+		// Values with two header names report the current one.
+		{CKA_ECDSA_PARAMS, "CKA_EC_PARAMS"},
+		{CKA_SUB_PRIME_BITS, "CKA_SUBPRIME_BITS"},
+		// Types the header does not name are rendered as hex.
+		{CKA_VENDOR_DEFINED | 1, "0x80000001"},
+		{0x00000999, "0x00000999"},
+	}
+	for _, c := range cases {
+		if got := AttributeName(c.typ); got != c.want {
+			t.Errorf("AttributeName(%#x) = %q, want %q", c.typ, got, c.want)
+		}
+	}
+}
+
 func TestNewMechanism(t *testing.T) {
 	m := NewMechanism(CKM_SHA256, nil)
 	if m.Mechanism != CKM_SHA256 {
@@ -119,5 +143,27 @@ func TestBytesToULongWidths(t *testing.T) {
 	// Bytes past the first CK_ULONG are ignored, not misread.
 	if BytesToULong(full) != BytesToULong(append(append([]byte{}, full...), full...)) {
 		t.Fatal("a value longer than a CK_ULONG was not truncated")
+	}
+}
+
+// TestInfoULong checks that CK_UNAVAILABLE_INFORMATION written by the module
+// compares equal to the Go constant, at this platform's CK_ULONG width and at
+// the 32-bit width of Windows' LLP64 model.
+func TestInfoULong(t *testing.T) {
+	if got := infoULong(ulongUnavailable); got != CK_UNAVAILABLE_INFORMATION {
+		t.Fatalf("infoULong(native ~0) = %#x, want CK_UNAVAILABLE_INFORMATION", got)
+	}
+	if got := infoULong(42); got != 42 {
+		t.Fatalf("infoULong(42) = %d, want 42", got)
+	}
+	if got := infoULong(CK_EFFECTIVELY_INFINITE); got != CK_EFFECTIVELY_INFINITE {
+		t.Fatalf("infoULong(CK_EFFECTIVELY_INFINITE) = %#x, want it unchanged", got)
+	}
+
+	saved := ulongUnavailable
+	ulongUnavailable = 0xFFFFFFFF // a 32-bit CK_ULONG
+	defer func() { ulongUnavailable = saved }()
+	if got := infoULong(0xFFFFFFFF); got != CK_UNAVAILABLE_INFORMATION {
+		t.Fatalf("infoULong(32-bit ~0) = %#x, want CK_UNAVAILABLE_INFORMATION", got)
 	}
 }

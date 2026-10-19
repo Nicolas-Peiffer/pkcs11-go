@@ -16,4 +16,4 @@
 // its published C headers.
 package cryptoki
 
-//go:generate go run ../cmd/genconst -header ../internal/headers/pkcs11t.h -out zconst.go -errout zerror.go -pkg cryptoki
+//go:generate go run ../cmd/genconst -header ../internal/headers/pkcs11t.h -out zconst.go -errout zerror.go -attrout zattr.go -pkg cryptoki
