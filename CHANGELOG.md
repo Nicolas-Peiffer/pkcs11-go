@@ -21,9 +21,19 @@ independent of the PKCS #11 specification revision the binding targets, which is
 - `SECURITY.md`: how to report a vulnerability privately (GitHub private vulnerability
   reporting or the Eclipse Foundation security team), which versions receive fixes, and what
   is in scope for a binding that loads native PKCS #11 modules.
+- `cryptoki.AttributeName`, which returns the `CKA_` symbol for an attribute type
+  (`"CKA_LABEL"`), or a hex code for a type the header does not name, for use in logs
+  and error messages. The names are generated from the OASIS v3.2 header by
+  `cmd/genconst` into `cryptoki/zattr.go`, alongside the existing `CKR_` table. Where
+  the header gives one value two names, the current one is reported: `CKA_EC_PARAMS`
+  over the deprecated `CKA_ECDSA_PARAMS`, `CKA_SUBPRIME_BITS` over its alias
+  `CKA_SUB_PRIME_BITS`. crypto11 uses it to render attribute sets instead of keeping
+  its own copy of the names.
 
 ### Changed
 
+- CI's "generated files are up to date" check now covers `cryptoki/zerror.go` and
+  `cryptoki/zattr.go` as well as `cryptoki/zconst.go`.
 - Build and test toolchain bumped from `go1.27.1` to `go1.27.2` (`toolchain` directive in
   `go.mod` and `.go-version`). go1.27.2 is a patch release that fixes the `net/http` and
   `net/http/internal/http2` standard-library vulnerabilities flagged by `govulncheck` on

@@ -24,6 +24,30 @@ func TestVersionString(t *testing.T) {
 	}
 }
 
+func TestAttributeName(t *testing.T) {
+	cases := []struct {
+		typ  uint
+		want string
+	}{
+		{CKA_CLASS, "CKA_CLASS"},
+		{CKA_LABEL, "CKA_LABEL"},
+		{CKA_WRAP_TEMPLATE, "CKA_WRAP_TEMPLATE"},
+		{CKA_SEED, "CKA_SEED"},
+		{CKA_VENDOR_DEFINED, "CKA_VENDOR_DEFINED"},
+		// Values with two header names report the current one.
+		{CKA_ECDSA_PARAMS, "CKA_EC_PARAMS"},
+		{CKA_SUB_PRIME_BITS, "CKA_SUBPRIME_BITS"},
+		// Types the header does not name are rendered as hex.
+		{CKA_VENDOR_DEFINED | 1, "0x80000001"},
+		{0x00000999, "0x00000999"},
+	}
+	for _, c := range cases {
+		if got := AttributeName(c.typ); got != c.want {
+			t.Errorf("AttributeName(%#x) = %q, want %q", c.typ, got, c.want)
+		}
+	}
+}
+
 func TestNewMechanism(t *testing.T) {
 	m := NewMechanism(CKM_SHA256, nil)
 	if m.Mechanism != CKM_SHA256 {
