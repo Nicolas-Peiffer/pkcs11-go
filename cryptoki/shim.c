@@ -171,9 +171,18 @@ static void ck_resolve_v32(ckModule *m) {
 
 	CK_INTERFACE_PTR iface = NULL;
 	CK_UTF8CHAR name[] = "PKCS 11";
-	/* NULL version asks the module for its newest interface. */
-	if (get_interface(name, NULL_PTR, &iface, 0) != CKR_OK || iface == NULL) {
-		return;
+	/* Ask for version 3.2 by name first. A NULL version returns the module's
+	 * default interface, which need not be its newest: a module whose default
+	 * is 3.0 but which also implements 3.2 would otherwise be treated as having
+	 * no 3.2 interface. */
+	CK_VERSION want = {3, 2};
+	if (get_interface(name, &want, &iface, 0) != CKR_OK || iface == NULL) {
+		/* Fall back to the default interface: a module may implement only
+		 * that lookup, or offer a newer 3.x than the version asked for. */
+		iface = NULL;
+		if (get_interface(name, NULL_PTR, &iface, 0) != CKR_OK || iface == NULL) {
+			return;
+		}
 	}
 
 	CK_FUNCTION_LIST_3_2_PTR list = (CK_FUNCTION_LIST_3_2_PTR)iface->pFunctionList;
