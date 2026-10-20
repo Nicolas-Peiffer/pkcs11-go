@@ -14,7 +14,7 @@ Versions here describe the Go API of the `cryptoki` and `p11` packages. They are
 independent of the PKCS #11 specification revision the binding targets, which is
 [OASIS PKCS #11 v3.2](https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html).
 
-## [1.2.0-rc3] - 2026-10-14
+## [Unreleased]
 
 ### Added
 
@@ -34,16 +34,6 @@ independent of the PKCS #11 specification revision the binding targets, which is
 
 - CI's "generated files are up to date" check now covers `cryptoki/zerror.go` and
   `cryptoki/zattr.go` as well as `cryptoki/zconst.go`.
-- Build and test toolchain bumped from `go1.27.1` to `go1.27.2` (`toolchain` directive in
-  `go.mod` and `.go-version`). go1.27.2 is a patch release that fixes the `net/http` and
-  `net/http/internal/http2` standard-library vulnerabilities flagged by `govulncheck` on
-  go1.27.1. CI reads the toolchain through `go-version-file: go.mod`.
-- **`gosec` pinned to a `master` commit** (`7157726`, `x/tools` v0.52.0) in
-  `.github/workflows/gosec.yml` and the `Makefile`, instead of the v2.29.0 release. The
-  v2.29.0 release links `golang.org/x/tools` v0.49.0, which cannot decode the go1.27.2
-  export data (version 5 is greater than the maximum supported version 4) and fails the
-  scan with an import error. Move back to a tagged release once one ships
-  `x/tools` >= v0.50.0.
 
 ### Fixed
 
@@ -70,6 +60,32 @@ independent of the PKCS #11 specification revision the binding targets, which is
   `GetObjectSize`, therefore never compared equal to `CK_UNAVAILABLE_INFORMATION` on Windows:
   a token reporting "unavailable" read as 4294967295. Those values are now mapped to the Go
   constant on every platform.
+- **`Finalize` wakes a blocking `WaitForSlotEvent`.** `WaitForSlotEvent` without
+  `CKF_DONT_BLOCK` blocks in `C_WaitForSlotEvent` until a token event, and held the `Ctx`
+  read lock for the whole call. `Finalize` takes the write lock, so it waited for a wait
+  that only it could end; once `Finalize` was queued for the write lock, every other call
+  on the `Ctx` queued behind it and the module froze. `WaitForSlotEvent` now drops the lock
+  before it calls into the module and registers itself so that `Destroy` does not unload
+  the library under a wait still running in it. No API or security change.
+
+## [1.2.0-rc3] - 2026-10-14
+
+Re-cut of [1.2.0-rc2] on `main`. The rc3 tag was created on the `release/1.2.0`
+branch; this section carries the identical content on `main`. See [1.2.0-rc2] for
+the earlier re-cut note.
+
+### Changed
+
+- Build and test toolchain bumped from `go1.27.1` to `go1.27.2` (`toolchain` directive in
+  `go.mod` and `.go-version`). go1.27.2 is a patch release that fixes the `net/http` and
+  `net/http/internal/http2` standard-library vulnerabilities flagged by `govulncheck` on
+  go1.27.1. CI reads the toolchain through `go-version-file: go.mod`.
+- **`gosec` pinned to a `master` commit** (`7157726`, `x/tools` v0.52.0) in
+  `.github/workflows/gosec.yml` and the `Makefile`, instead of the v2.29.0 release. The
+  v2.29.0 release links `golang.org/x/tools` v0.49.0, which cannot decode the go1.27.2
+  export data (version 5 is greater than the maximum supported version 4) and fails the
+  scan with an import error. Move back to a tagged release once one ships
+  `x/tools` >= v0.50.0.
 
 ## [1.2.0-rc2] - 2026-10-06
 
