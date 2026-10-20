@@ -16,6 +16,20 @@ independent of the PKCS #11 specification revision the binding targets, which is
 
 ## [Unreleased]
 
+### Security
+
+- Hardened `EncapsulateKey` against a module that reports a ciphertext length larger than
+  the buffer it was given: the length is now checked against the allocation, and a key the
+  module created on a failed data pass is destroyed.
+- `p11` now applies the same secure defaults (`CKA_SENSITIVE`, `CKA_EXTRACTABLE`,
+  `CKA_PRIVATE`) to keys created by `Unwrap`, `Derive`, `Encapsulate` and `Decapsulate` as
+  it already did to `CreateObject`, `GenerateKey` and `GenerateKeyPair`.
+- The mechanism policy set by `SetMechanismPolicy` is now enforced for every operation,
+  including mechanisms built as struct literals and the digests named inside OAEP, PSS and
+  ECDH1 parameters.
+- `GetAttributeValue` now refuses `CKA_ENCAPSULATE_TEMPLATE` and
+  `CKA_DECAPSULATE_TEMPLATE` as array attributes, and zeroes value buffers.
+
 ### Added
 
 - `SECURITY.md`: how to report a vulnerability privately (GitHub private vulnerability
