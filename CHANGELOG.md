@@ -16,8 +16,24 @@ independent of the PKCS #11 specification revision the binding targets, which is
 
 ## [1.2.0-rc3] - 2026-10-14
 
+### Added
+
+- `SECURITY.md`: how to report a vulnerability privately (GitHub private vulnerability
+  reporting or the Eclipse Foundation security team), which versions receive fixes, and what
+  is in scope for a binding that loads native PKCS #11 modules.
+- `cryptoki.AttributeName`, which returns the `CKA_` symbol for an attribute type
+  (`"CKA_LABEL"`), or a hex code for a type the header does not name, for use in logs
+  and error messages. The names are generated from the OASIS v3.2 header by
+  `cmd/genconst` into `cryptoki/zattr.go`, alongside the existing `CKR_` table. Where
+  the header gives one value two names, the current one is reported: `CKA_EC_PARAMS`
+  over the deprecated `CKA_ECDSA_PARAMS`, `CKA_SUBPRIME_BITS` over its alias
+  `CKA_SUB_PRIME_BITS`. crypto11 uses it to render attribute sets instead of keeping
+  its own copy of the names.
+
 ### Changed
 
+- CI's "generated files are up to date" check now covers `cryptoki/zerror.go` and
+  `cryptoki/zattr.go` as well as `cryptoki/zconst.go`.
 - Build and test toolchain bumped from `go1.27.1` to `go1.27.2` (`toolchain` directive in
   `go.mod` and `.go-version`). go1.27.2 is a patch release that fixes the `net/http` and
   `net/http/internal/http2` standard-library vulnerabilities flagged by `govulncheck` on
@@ -28,6 +44,32 @@ independent of the PKCS #11 specification revision the binding targets, which is
   export data (version 5 is greater than the maximum supported version 4) and fails the
   scan with an import error. Move back to a tagged release once one ships
   `x/tools` >= v0.50.0.
+
+### Fixed
+
+- **Zero-length input is passed as a valid buffer.** `Sign`, `Verify`, `Encrypt`,
+  `Decrypt`, `Digest`, their `Update` variants, the combined dual-function calls,
+  `VerifySignature*`, `DecapsulateKey`, `WrapKeyAuthenticated`/`UnwrapKeyAuthenticated`,
+  `UnwrapKey`, `SeedRandom` and `SetOperationState` handed the module a NULL pointer for
+  an empty slice. PKCS #11 does not promise that NULL is acceptable when the length is 0,
+  and SoftHSM2 rejects it with `CKR_ARGUMENTS_BAD`, so the digest or signature of an
+  empty message, and AES-GCM over associated data only, could not be computed. Every data
+  input now gets a non-NULL buffer with length 0. This replaces the one-off workaround
+  `SignUpdate` and `VerifyUpdate` already carried. Mechanism parameters, attribute
+  values and PINs are unchanged, since for those NULL means "absent".
+- **A module's v3.2 interface is found when it is not the default.** The loader called
+  `C_GetInterface("PKCS 11", NULL, …)`, which returns the module's *default* interface. A
+  module whose default is 3.0 but which also implements 3.2 was therefore reported by
+  `SupportsV32` as lacking it, and the v3.2 calls (ML-KEM encapsulation, `VerifySignature`,
+  authenticated wrapping) failed with `CKR_FUNCTION_NOT_SUPPORTED`. The loader now asks for
+  version 3.2 by name first and falls back to the default interface. A mock module built by
+  the new `TestInterfaceNegotiation` covers both paths and a 3.0-only module.
+- **`CK_UNAVAILABLE_INFORMATION` on Windows.** A module writes it as ~0 in the width of
+  `CK_ULONG`, which is 32 bits on Windows, while the Go constant is `^uint(0)`, 64 bits
+  everywhere. The session counters and memory fields of `TokenInfo`, and the result of
+  `GetObjectSize`, therefore never compared equal to `CK_UNAVAILABLE_INFORMATION` on Windows:
+  a token reporting "unavailable" read as 4294967295. Those values are now mapped to the Go
+  constant on every platform.
 
 ## [1.2.0-rc2] - 2026-10-06
 

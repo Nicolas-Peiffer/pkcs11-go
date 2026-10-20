@@ -19,7 +19,7 @@ func (c *Ctx) SeedRandom(sh SessionHandle, seed []byte) error {
 		return err
 	}
 	defer release()
-	p, n := cBytes(seed)
+	p, n := cInput(seed)
 	defer zfree(p, n)
 	return toError(uint(C.ck_seed_random(m, C.CK_SESSION_HANDLE(sh), (C.CK_BYTE_PTR)(p), n)))
 }
