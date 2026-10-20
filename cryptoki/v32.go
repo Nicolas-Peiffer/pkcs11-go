@@ -30,7 +30,10 @@ func (c *Ctx) EncapsulateKey(sh SessionHandle, m *Mechanism, pubKey ObjectHandle
 		return nil, 0, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return nil, 0, err
+	}
 	defer freeMech()
 	arr, n, freeAttrs := cAttributes(tmpl)
 	defer freeAttrs()
@@ -47,6 +50,9 @@ func (c *Ctx) EncapsulateKey(sh SessionHandle, m *Mechanism, pubKey ObjectHandle
 
 	var buf unsafe.Pointer
 	var ctPtr C.CK_BYTE_PTR
+	// allocLen is the capacity of buf. Keep it apart from ctLen, which the data
+	// pass overwrites with whatever length the module reports.
+	allocLen := ctLen
 	if ctLen > 0 {
 		// ctLen is module-reported. Bound it by maxOutBuf (as outOp does) and
 		// by the C.int range C.GoBytes accepts, so a bogus length cannot drive
@@ -66,6 +72,14 @@ func (c *Ctx) EncapsulateKey(sh SessionHandle, m *Mechanism, pubKey ObjectHandle
 	if err := toError(uint(rv)); err != nil {
 		return nil, 0, err
 	}
+	// A successful data pass must not report more ciphertext than the buffer
+	// it was given; C.GoBytes would otherwise read past the allocation (or
+	// from NULL when the sizing pass reported zero). The module has already
+	// created the key, so destroy it rather than hand back an orphan.
+	if ctLen > allocLen {
+		_ = C.ck_destroy_object(mod, C.CK_SESSION_HANDLE(sh), key)
+		return nil, 0, fmt.Errorf("cryptoki: EncapsulateKey: module reported ciphertext size %d exceeding buffer %d", uint64(ctLen), uint64(allocLen))
+	}
 	var ct []byte
 	if ctLen > 0 {
 		ct = C.GoBytes(buf, C.int(ctLen))
@@ -83,7 +97,10 @@ func (c *Ctx) DecapsulateKey(sh SessionHandle, m *Mechanism, privKey ObjectHandl
 		return 0, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return 0, err
+	}
 	defer freeMech()
 	arr, n, freeAttrs := cAttributes(tmpl)
 	defer freeAttrs()
@@ -108,7 +125,10 @@ func (c *Ctx) VerifySignatureInit(sh SessionHandle, m *Mechanism, key ObjectHand
 		return err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return err
+	}
 	defer freeMech()
 	sig, sn := cInput(signature)
 	defer free(sig)
@@ -180,7 +200,10 @@ func (c *Ctx) WrapKeyAuthenticated(sh SessionHandle, m *Mechanism, wrappingKey, 
 		return nil, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return nil, err
+	}
 	defer freeMech()
 	ad, adLen := cInput(aad)
 	defer free(ad)
@@ -200,7 +223,10 @@ func (c *Ctx) UnwrapKeyAuthenticated(sh SessionHandle, m *Mechanism, unwrappingK
 		return 0, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return 0, err
+	}
 	defer freeMech()
 	wp, wn := cInput(wrapped)
 	defer free(wp)

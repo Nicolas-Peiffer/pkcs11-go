@@ -16,7 +16,10 @@ func (c *Ctx) WrapKey(sh SessionHandle, m *Mechanism, wrappingKey, key ObjectHan
 		return nil, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return nil, err
+	}
 	defer freeMech()
 	return outOp(func(out C.CK_BYTE_PTR, outLen *C.CK_ULONG) C.CK_RV {
 		return C.ck_wrap_key(mod, C.CK_SESSION_HANDLE(sh), mech,
@@ -32,7 +35,10 @@ func (c *Ctx) UnwrapKey(sh SessionHandle, m *Mechanism, unwrappingKey ObjectHand
 		return 0, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return 0, err
+	}
 	defer freeMech()
 	wp, wn := cInput(wrapped)
 	defer free(wp)
@@ -56,7 +62,10 @@ func (c *Ctx) DeriveKey(sh SessionHandle, m *Mechanism, baseKey ObjectHandle, tm
 		return 0, err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return 0, err
+	}
 	defer freeMech()
 	arr, n, freeAttrs := cAttributes(tmpl)
 	defer freeAttrs()

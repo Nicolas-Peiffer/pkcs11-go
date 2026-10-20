@@ -10,7 +10,10 @@ import (
 
 // MechanismPolicy decides whether a mechanism may be used. It is consulted by
 // NewMechanism and NewMechanismWithParams before a Mechanism is built, so a
-// policy violation is reported at construction time rather than by the token.
+// policy violation is reported at construction time rather than by the token,
+// and again whenever a Mechanism is passed to an operation, so a Mechanism
+// built as a struct literal cannot bypass it. The digests a structured
+// parameter names (OAEP/PSS hash and MGF, ECDH1 KDF) are checked as well.
 //
 // A nil policy (the default) permits every mechanism: the binding does not
 // second-guess a caller who deliberately selects a legacy algorithm. Install a
@@ -51,6 +54,64 @@ func checkMechanism(mechanism uint) error {
 		return nil
 	}
 	return p.Allow(mechanism)
+}
+
+// checkMechanismUse consults the installed policy for m and for every digest
+// mechanism its structured parameter names (the OAEP/PSS hash and MGF, the
+// ECDH1 KDF). It runs when a Mechanism is handed to the module, so a Mechanism
+// built as a struct literal, or with a weak hash inside an otherwise strong
+// parameter block, is still subject to the policy.
+func checkMechanismUse(m *Mechanism) error {
+	if err := checkMechanism(m.Mechanism); err != nil {
+		return err
+	}
+	if hp, ok := m.params.(interface{ hashMechanisms() []uint }); ok {
+		for _, h := range hp.hashMechanisms() {
+			if err := checkMechanism(h); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// mgfHash maps a CKG_MGF1_* mask generation function to the digest mechanism
+// it runs on, so the policy can judge an OAEP/PSS MGF like any other hash.
+var mgfHash = map[uint]uint{
+	CKG_MGF1_SHA1:     CKM_SHA_1,
+	CKG_MGF1_SHA224:   CKM_SHA224,
+	CKG_MGF1_SHA256:   CKM_SHA256,
+	CKG_MGF1_SHA384:   CKM_SHA384,
+	CKG_MGF1_SHA512:   CKM_SHA512,
+	CKG_MGF1_SHA3_224: CKM_SHA3_224,
+	CKG_MGF1_SHA3_256: CKM_SHA3_256,
+	CKG_MGF1_SHA3_384: CKM_SHA3_384,
+	CKG_MGF1_SHA3_512: CKM_SHA3_512,
+}
+
+// kdfHash maps a CKD_* key derivation function to the digest mechanism it
+// runs on. CKD_NULL and KDFs without a CKM_ digest counterpart are absent.
+var kdfHash = map[uint]uint{
+	CKD_SHA1_KDF:             CKM_SHA_1,
+	CKD_SHA1_KDF_ASN1:        CKM_SHA_1,
+	CKD_SHA1_KDF_CONCATENATE: CKM_SHA_1,
+	CKD_SHA1_KDF_SP800:       CKM_SHA_1,
+	CKD_SHA224_KDF:           CKM_SHA224,
+	CKD_SHA224_KDF_SP800:     CKM_SHA224,
+	CKD_SHA256_KDF:           CKM_SHA256,
+	CKD_SHA256_KDF_SP800:     CKM_SHA256,
+	CKD_SHA384_KDF:           CKM_SHA384,
+	CKD_SHA384_KDF_SP800:     CKM_SHA384,
+	CKD_SHA512_KDF:           CKM_SHA512,
+	CKD_SHA512_KDF_SP800:     CKM_SHA512,
+	CKD_SHA3_224_KDF:         CKM_SHA3_224,
+	CKD_SHA3_224_KDF_SP800:   CKM_SHA3_224,
+	CKD_SHA3_256_KDF:         CKM_SHA3_256,
+	CKD_SHA3_256_KDF_SP800:   CKM_SHA3_256,
+	CKD_SHA3_384_KDF:         CKM_SHA3_384,
+	CKD_SHA3_384_KDF_SP800:   CKM_SHA3_384,
+	CKD_SHA3_512_KDF:         CKM_SHA3_512,
+	CKD_SHA3_512_KDF_SP800:   CKM_SHA3_512,
 }
 
 // weakMechanisms is the set of mechanisms a RejectWeakMechanisms policy refuses:

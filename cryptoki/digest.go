@@ -15,7 +15,10 @@ func (c *Ctx) DigestInit(sh SessionHandle, m *Mechanism) error {
 		return err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return err
+	}
 	defer freeMech()
 	return toError(uint(C.ck_digest_init(mod, C.CK_SESSION_HANDLE(sh), mech)))
 }

@@ -15,7 +15,10 @@ func (c *Ctx) EncryptInit(sh SessionHandle, m *Mechanism, key ObjectHandle) erro
 		return err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return err
+	}
 	defer freeMech()
 	return toError(uint(C.ck_encrypt_init(mod, C.CK_SESSION_HANDLE(sh), mech, C.CK_OBJECT_HANDLE(key))))
 }
@@ -69,7 +72,10 @@ func (c *Ctx) DecryptInit(sh SessionHandle, m *Mechanism, key ObjectHandle) erro
 		return err
 	}
 	defer release()
-	mech, freeMech := cMechanism(m)
+	mech, freeMech, err := cMechanism(m)
+	if err != nil {
+		return err
+	}
 	defer freeMech()
 	return toError(uint(C.ck_decrypt_init(mod, C.CK_SESSION_HANDLE(sh), mech, C.CK_OBJECT_HANDLE(key))))
 }

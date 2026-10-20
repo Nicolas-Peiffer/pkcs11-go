@@ -146,7 +146,7 @@ func (c *Ctx) GetAttributeValue(sh SessionHandle, obj ObjectHandle, tmpl []*Attr
 	// dereference indeterminate pointers. Reject these types up front rather than
 	// passing uninitialized descriptors to native code.
 	for _, a := range tmpl {
-		if a.Type&CKF_ARRAY_ATTRIBUTE != 0 {
+		if isArrayAttribute(a.Type) {
 			return nil, fmt.Errorf("cryptoki: GetAttributeValue: array attribute 0x%x is not supported", a.Type)
 		}
 	}
@@ -190,8 +190,15 @@ func (c *Ctx) GetAttributeValue(sh SessionHandle, obj ObjectHandle, tmpl []*Attr
 	allocs := make([]alloc, n)
 	for i := range list {
 		if list[i].ulValueLen != unavailable && list[i].ulValueLen > 0 {
-			list[i].pValue = C.CK_VOID_PTR(C.malloc(list[i].ulValueLen))
-			allocs[i] = alloc{unsafe.Pointer(list[i].pValue), list[i].ulValueLen}
+			// Zeroed, so that a module reading the buffer as an array of
+			// CK_ATTRIBUTE (an array attribute this package does not know
+			// about) finds NULL value pointers rather than heap garbage.
+			p := C.calloc(1, list[i].ulValueLen)
+			if p == nil {
+				panic("cryptoki: C.calloc failed (out of memory)")
+			}
+			list[i].pValue = C.CK_VOID_PTR(p)
+			allocs[i] = alloc{p, list[i].ulValueLen}
 		}
 	}
 	defer func() {
@@ -228,6 +235,19 @@ func (c *Ctx) GetAttributeValue(sh SessionHandle, obj ObjectHandle, tmpl []*Attr
 	}
 	// Surface the soft failure (if any) alongside the partial results.
 	return out, toError(rv)
+}
+
+// isArrayAttribute reports whether attributes of type t hold an array of
+// CK_ATTRIBUTE structures rather than a flat value. Such types normally carry
+// CKF_ARRAY_ATTRIBUTE, but the v3.2 header defines CKA_ENCAPSULATE_TEMPLATE and
+// CKA_DECAPSULATE_TEMPLATE without it, although they are templates like
+// CKA_WRAP_TEMPLATE and CKA_UNWRAP_TEMPLATE.
+func isArrayAttribute(t uint) bool {
+	switch t {
+	case CKA_ENCAPSULATE_TEMPLATE, CKA_DECAPSULATE_TEMPLATE:
+		return true
+	}
+	return t&CKF_ARRAY_ATTRIBUTE != 0
 }
 
 // SetAttributeValue modifies attribute values on an object (C_SetAttributeValue).
