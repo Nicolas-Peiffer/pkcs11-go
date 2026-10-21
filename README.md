@@ -9,6 +9,7 @@
 [![Licence](https://img.shields.io/github/license/eclipse-keypont/pkcs11-go?style=flat-square&logo=opensourceinitiative&logoColor=white&color=1f6feb)](./LICENSE)
 [![Go Reference](https://img.shields.io/badge/pkg.go.dev-reference-007d9c?style=flat-square&logo=go&logoColor=white)](https://pkg.go.dev/github.com/eclipse-keypont/pkcs11-go)
 [![Release](https://img.shields.io/github/v/release/eclipse-keypont/pkcs11-go?style=flat-square&logo=github&logoColor=white&color=1f6feb)](https://github.com/eclipse-keypont/pkcs11-go/releases/latest)
+[![Changelog](https://img.shields.io/badge/changelog-v1.x-1f6feb?style=flat-square&logo=keepachangelog&logoColor=white)](./CHANGELOG.md)
 
 [![Build](https://img.shields.io/github/actions/workflow/status/eclipse-keypont/pkcs11-go/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=build)](https://github.com/eclipse-keypont/pkcs11-go/actions/workflows/ci.yml)
 [![Lint](https://img.shields.io/github/actions/workflow/status/eclipse-keypont/pkcs11-go/lint.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=lint)](https://github.com/eclipse-keypont/pkcs11-go/actions/workflows/lint.yml)
