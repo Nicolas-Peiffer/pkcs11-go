@@ -10,31 +10,41 @@ plaintext across the cgo boundary, and the projects built on it, such as
 [crypto11](https://github.com/eclipse-keypont/crypto11), broker access to keys held in HSMs
 through it. We take reports seriously and would rather hear about a suspected issue than not.
 
+This project is an Eclipse Foundation project and adheres to the
+[Eclipse Foundation Vulnerability Reporting Policy](https://www.eclipse.org/security/policy/).
+
 ## Reporting a vulnerability
 
 **Please do not report security vulnerabilities through public GitHub issues, discussions or pull
 requests.**
 
-Report privately through either channel:
+Report privately through any of these channels:
 
 - **[GitHub private vulnerability reporting](https://github.com/eclipse-keypont/pkcs11-go/security/advisories/new)**
   — preferred. It keeps the report, the fix and the advisory in one place.
+- **The Eclipse Foundation Vulnerability Reporting Tracker**, by creating a
+  [confidential issue](https://gitlab.eclipse.org/security/vulnerability-reports/-/issues/new?issuable_template=new_vulnerability).
+  This is the Foundation-level channel and the right one if the issue spans several Eclipse KeyPont
+  projects — a binding defect that crypto11 exposes, say.
 - **The Eclipse Foundation security team**, at <security@eclipse-foundation.org>. See the
   [Eclipse Foundation Security Policy](https://www.eclipse.org/security/policy/) for the
-  Foundation-level process. Use this channel if the issue spans several Eclipse KeyPont projects —
-  a binding defect that crypto11 exposes, say — or if you would rather not report through GitHub.
+  Foundation-level process. Use this channel if you would rather not report through GitHub or GitLab.
 
 ### What to include
 
 The more of this you can supply, the faster we can confirm and fix:
 
-- A description of the issue and why you believe it has security impact.
+- A description of the issue and why you believe it has security impact, including the type of
+  issue (for example a buffer overflow, an out-of-bounds read, or a secret leak).
 - The affected version or commit, and whether `main` is affected.
 - The platform (OS, architecture, Go version) — `CK_ULONG` width and the loader differ between
   Unix and Windows.
 - The PKCS #11 module involved (vendor, product, library version), if the issue depends on one.
+- Step-by-step instructions to reproduce the issue, and the location of the affected source code
+  (tag/branch/commit or direct URL), with full paths of the source files involved.
+- Any configuration required to reproduce the issue, and related log files if you have them.
 - A minimal reproducer. A small mock module that returns the values that trigger the bug is often
-  the clearest one.
+  the clearest one. Proof-of-concept or exploit code is welcome if you have it.
 - Whether you intend to disclose publicly, and on what timeline.
 
 Reports in any language are fine, and a partial report is better than none.
@@ -44,6 +54,11 @@ Reports in any language are fine, and a partial report is better than none.
 We will tell you when we have confirmed the issue, when a fix lands, and when the advisory is
 published. If we conclude the report is not a vulnerability we will explain why, and you are
 welcome to push back. This is a modest project; we do our best to respond promptly.
+
+We work on a best-effort basis, but a strong security CI/CD pipeline backs every change: linting,
+static analysis, vulnerability scanning and signed, provenance-attested releases. It reduces the
+odds of a defect reaching a release, and it is why we would rather hear about a suspected issue
+than not.
 
 ## Disclosure
 
