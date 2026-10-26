@@ -14,15 +14,144 @@ Versions here describe the Go API of the `cryptoki` and `p11` packages. They are
 independent of the PKCS #11 specification revision the binding targets, which is
 [OASIS PKCS #11 v3.2](https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/pkcs11-spec-v3.2.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-10-26
+
+The final release of the 1.2.0 line. This section lists everything since [1.1.1],
+including the changes first published in [1.2.0-rc1] through [1.2.0-rc4].
+
+### Added
+
+- `cryptoki.MechanismPolicy` (interface) and `cryptoki.MechanismPolicyFunc`
+  (adapter), with `SetMechanismPolicy` to install a process-wide policy and
+  `RejectWeakMechanisms` as a ready-made policy that refuses MD2/MD5/SHA-1,
+  single-DES, RC2/RC4, and the SSLv3 MACs. `NewMechanism` and
+  `NewMechanismWithParams` consult the policy and panic on a rejected mechanism,
+  so a weak-algorithm selection fails at construction rather than at the token.
+  The default (nil) policy permits every mechanism.
+- `cryptoki.GCMParamsSize` — the size of the native `CK_GCM_PARAMS` (48 bytes on
+  LP64), so callers can size a parameter block without importing `"C"`.
+- `cryptoki.Mlock` and `cryptoki.Munlock` — best-effort page pinning of a byte
+  slice (mlock/munlock) so secret material is not written to swap. Documented as
+  defence-in-depth only: the Go GC may move or copy the backing array, so keep
+  secrets inside the HSM where possible.
+- `cryptoki.AttributeName`, which returns the `CKA_` symbol for an attribute type
+  (`"CKA_LABEL"`), or a hex code for a type the header does not name, for use in logs
+  and error messages. The names are generated from the OASIS v3.2 header by
+  `cmd/genconst` into `cryptoki/zattr.go`, alongside the existing `CKR_` table. Where
+  the header gives one value two names, the current one is reported: `CKA_EC_PARAMS`
+  over the deprecated `CKA_ECDSA_PARAMS`, `CKA_SUBPRIME_BITS` over its alias
+  `CKA_SUB_PRIME_BITS`. crypto11 uses it to render attribute sets instead of keeping
+  its own copy of the names.
+- `SECURITY.md`: how to report a vulnerability privately (GitHub private vulnerability
+  reporting or the Eclipse Foundation security team), which versions receive fixes, and what
+  is in scope for a binding that loads native PKCS #11 modules.
 
 ### Changed
 
-- Build and test toolchain bumped from `go1.27.2` to `go1.27.3` (`toolchain` directive in
-  `go.mod` and `.go-version`). go1.27.3 is a patch release that fixes the `crypto/x509`
-  standard-library vulnerability `GO-2026-6809` ("distrust compromised intermediate
-  certificates") flagged by `govulncheck` on go1.27.2. CI reads the toolchain through
-  `go-version-file: go.mod`.
+- `p11.Session.CreateObject`, `GenerateKey`, and `GenerateKeyPair` now apply
+  secure-by-default attributes for any the caller does not set:
+  `CKA_SENSITIVE=true`, `CKA_EXTRACTABLE=false`, and (for private/secret objects)
+  `CKA_PRIVATE=true`. An explicit value always wins, so this only fills gaps; a
+  caller that needs an extractable key must now set `CKA_EXTRACTABLE=true` itself.
+- `p11.Session.Close` is idempotent, and `Object`/`SecretKey`/`PublicKey`/
+  `PrivateKey` operations now fail fast with an error on a closed session instead
+  of issuing calls on a dead handle.
+- `cryptoki.NewPSSParams` rejects a negative salt length (panics, matching the
+  constructor convention used elsewhere in the package).
+- `cryptoki.GCMParams.Free` defers the native free while a GCM operation is in
+  flight, so a caller cannot free the parameter block out from under an active
+  `Encrypt`/`Decrypt`.
+- The common (2.x) entry points now dispatch through the module's >= 3.2 function
+  list when it advertises one, falling back to the base 2.x list otherwise.
+- Build and test toolchain bumped from `go1.27.1` to `go1.27.3` (`toolchain`
+  directive in `go.mod` and `.go-version`). go1.27.2 fixed the `net/http` and
+  `net/http/internal/http2` standard-library vulnerabilities; go1.27.3 fixes the
+  `crypto/x509` vulnerability `GO-2026-6809` ("distrust compromised intermediate
+  certificates"). CI reads the toolchain through `go-version-file: go.mod`.
+- **`gosec` pinned to a `master` commit** (`7157726`, `x/tools` v0.52.0) in
+  `.github/workflows/gosec.yml` and the `Makefile`, instead of the v2.29.0 release. The
+  v2.29.0 release links `golang.org/x/tools` v0.49.0, which cannot decode the go1.27.2
+  export data (version 5 is greater than the maximum supported version 4) and fails the
+  scan with an import error. Move back to a tagged release once one ships
+  `x/tools` >= v0.50.0.
+- CI's "generated files are up to date" check now covers `cryptoki/zerror.go` and
+  `cryptoki/zattr.go` as well as `cryptoki/zconst.go`.
+
+### Security
+
+- `cAttributes` computed its native allocation size from an unbounded attribute
+  count, so a count large enough to wrap the multiplication could make
+  `unsafe.Slice` write out of bounds (CWE-190). The count is now bounds-checked
+  against the output cap before allocating, and every `C.malloc` in the package
+  panics on a NULL return rather than dereferencing it.
+- `GetSlotList` and `GetMechanismList` now cap the module-reported count, and
+  `EncapsulateKey` caps the reported ciphertext length, so a module cannot drive
+  an unbounded native allocation (CWE-789).
+- The four combined streaming operations (`DigestEncryptUpdate`,
+  `DecryptDigestUpdate`, `SignEncryptUpdate`, `DecryptVerifyUpdate`) now scrub
+  their input buffers before freeing them, matching the rest of the package
+  (CWE-226).
+- `cmd/genconst` now validates every translated macro value against a
+  constant-expression allowlist and rejects comment introducers and function
+  calls, so a tampered `pkcs11t.h` fails the build instead of injecting code into
+  the generated source (CWE-94). Generated output is unchanged.
+- Hardened `EncapsulateKey` against a module that reports a ciphertext length larger than
+  the buffer it was given: the length is now checked against the allocation, and a key the
+  module created on a failed data pass is destroyed.
+- `p11` now applies the same secure defaults (`CKA_SENSITIVE`, `CKA_EXTRACTABLE`,
+  `CKA_PRIVATE`) to keys created by `Unwrap`, `Derive`, `Encapsulate` and `Decapsulate` as
+  it already did to `CreateObject`, `GenerateKey` and `GenerateKeyPair`.
+- The mechanism policy set by `SetMechanismPolicy` is now enforced for every operation,
+  including mechanisms built as struct literals and the digests named inside OAEP, PSS and
+  ECDH1 parameters.
+- `GetAttributeValue` now refuses `CKA_ENCAPSULATE_TEMPLATE` and
+  `CKA_DECAPSULATE_TEMPLATE` as array attributes, and zeroes value buffers.
+
+### Fixed
+
+- `GCMParams` could be freed while an operation still referenced it; `Free` now
+  tracks in-flight use and defers the free until the operation completes.
+- **Zero-length input is passed as a valid buffer.** `Sign`, `Verify`, `Encrypt`,
+  `Decrypt`, `Digest`, their `Update` variants, the combined dual-function calls,
+  `VerifySignature*`, `DecapsulateKey`, `WrapKeyAuthenticated`/`UnwrapKeyAuthenticated`,
+  `UnwrapKey`, `SeedRandom` and `SetOperationState` handed the module a NULL pointer for
+  an empty slice. PKCS #11 does not promise that NULL is acceptable when the length is 0,
+  and SoftHSM2 rejects it with `CKR_ARGUMENTS_BAD`, so the digest or signature of an
+  empty message, and AES-GCM over associated data only, could not be computed. Every data
+  input now gets a non-NULL buffer with length 0. This replaces the one-off workaround
+  `SignUpdate` and `VerifyUpdate` already carried. Mechanism parameters, attribute
+  values and PINs are unchanged, since for those NULL means "absent".
+- **A module's v3.2 interface is found when it is not the default.** The loader called
+  `C_GetInterface("PKCS 11", NULL, …)`, which returns the module's *default* interface. A
+  module whose default is 3.0 but which also implements 3.2 was therefore reported by
+  `SupportsV32` as lacking it, and the v3.2 calls (ML-KEM encapsulation, `VerifySignature`,
+  authenticated wrapping) failed with `CKR_FUNCTION_NOT_SUPPORTED`. The loader now asks for
+  version 3.2 by name first and falls back to the default interface. A mock module built by
+  the new `TestInterfaceNegotiation` covers both paths and a 3.0-only module.
+- **`CK_UNAVAILABLE_INFORMATION` on Windows.** A module writes it as ~0 in the width of
+  `CK_ULONG`, which is 32 bits on Windows, while the Go constant is `^uint(0)`, 64 bits
+  everywhere. The session counters and memory fields of `TokenInfo`, and the result of
+  `GetObjectSize`, therefore never compared equal to `CK_UNAVAILABLE_INFORMATION` on Windows:
+  a token reporting "unavailable" read as 4294967295. Those values are now mapped to the Go
+  constant on every platform.
+- **`Finalize` wakes a blocking `WaitForSlotEvent`.** `WaitForSlotEvent` without
+  `CKF_DONT_BLOCK` blocks in `C_WaitForSlotEvent` until a token event, and held the `Ctx`
+  read lock for the whole call. `Finalize` takes the write lock, so it waited for a wait
+  that only it could end; once `Finalize` was queued for the write lock, every other call
+  on the `Ctx` queued behind it and the module froze. `WaitForSlotEvent` now drops the lock
+  before it calls into the module and registers itself so that `Destroy` does not unload
+  the library under a wait still running in it. No API or security change.
+
+### Known limitations
+
+- `Mlock`/`Munlock` are best effort and cannot make a Go slice a reliable secret
+  store (the GC may move the backing array). Prefer non-extractable, sensitive
+  keys held in the HSM.
+- The Windows cgo build and the SoftHSM integration job are disabled in CI
+  (`if: false` in `ci.yml`) pending fixes, so this release is verified by unit
+  tests, lint, and the vulnerability and fuzz jobs only. Note that the CK_ULONG
+  work above targets Windows' LLP64 width but is not currently exercised by a
+  Windows CI run.
 
 ## [1.2.0-rc4] - 2026-10-20
 
@@ -339,7 +468,8 @@ specification and its C headers, with no code copied from existing bindings.
   and IPR policy for the three headers vendored verbatim under
   `internal/headers/`.
 
-[Unreleased]: https://github.com/eclipse-keypont/pkcs11-go/compare/v1.2.0-rc4...HEAD
+[Unreleased]: https://github.com/eclipse-keypont/pkcs11-go/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/eclipse-keypont/pkcs11-go/compare/v1.1.1...v1.2.0
 [1.2.0-rc4]: https://github.com/eclipse-keypont/pkcs11-go/compare/v1.2.0-rc3...v1.2.0-rc4
 [1.2.0-rc3]: https://github.com/eclipse-keypont/pkcs11-go/compare/v1.2.0-rc2...v1.2.0-rc3
 [1.2.0-rc2]: https://github.com/eclipse-keypont/pkcs11-go/compare/v1.2.0-rc1...v1.2.0-rc2
